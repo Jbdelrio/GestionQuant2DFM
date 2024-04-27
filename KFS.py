@@ -1,4 +1,5 @@
 import numpy as np
+
 class KalmanFilterSmoother:
     def __init__(self, A, C, Q, R, initial_state, initial_covariance):
         """
