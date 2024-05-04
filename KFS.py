@@ -1,9 +1,8 @@
 import numpy as np
 class KalmanFilterSmoother:
-    def __init__(self, A, C, Q, R, initial_state, initial_covariance):
+    def __init__(self, A, C, Q, R, initial_state, initial_covariance,iterations):
         """
         Initialise le filtre de Kalman.
-        
         :param A: Matrice de transition d'état.
         :param C: Matrice d'observation.
         :param Q: Matrice de covariance du bruit du processus.
@@ -11,6 +10,12 @@ class KalmanFilterSmoother:
         :param initial_state: État initial estimé du système.
         :param initial_covariance: Covariance initiale estimée.
         """
+
+        if A.shape[0] != A.shape[1]:
+            raise ValueError("La matrice A doit être carrée.")
+
+        if initial_state.ndim != 1 or initial_state.shape[0] != A.shape[0]:
+            raise ValueError("L'état initial doit être un vecteur correspondant à la dimension de A.")
 
         self.A = A  # Matrice de transition d'état
         self.C = C  # Matrice d'observation
@@ -23,8 +28,8 @@ class KalmanFilterSmoother:
         self.current_covariance_estimate = initial_covariance
         self.states = []  # Stocker les états estimés pour le lissage
         self.covariances = []  # Stocker les covariances estimées pour le lissage
-
-    def kalman_filter(self, observation):
+        self.iterations=iterations
+    def _kalman_filter(self, observation):
         """
         Applique le filtre de Kalman pour une seule observation.
         
@@ -46,7 +51,7 @@ class KalmanFilterSmoother:
         self.states.append(self.current_state_estimate.copy())
         self.covariances.append(self.current_covariance_estimate.copy())
 
-    def kalman_smoother(self):
+    def _kalman_smoother(self):
         """
         Applique le lisseur de Kalman pour estimer les états passés.
         """
@@ -55,7 +60,7 @@ class KalmanFilterSmoother:
         # Commence avec l'estimation finale du filtre de Kalman
         previous_smoothed_state = smoothed_states[0]
         previous_smoothed_covariance = smoothed_covariances[0]
-        
+       
         for t in range(1, len(smoothed_states)):
             # Extraction des estimations à l'instant t
             current_state = self.states[-t-1]
@@ -76,6 +81,7 @@ class KalmanFilterSmoother:
         # Inversion des séquences lissées pour correspondre à l'ordre de temps original
         self.smoothed_states = smoothed_states[::-1]
         self.smoothed_covariances = smoothed_covariances[::-1]
+    
     def e_step(self):
         """
         Calcule les attentes pour l'étape E de l'algorithme EM.
@@ -105,16 +111,16 @@ class KalmanFilterSmoother:
             print("Pas assez de données pour mettre à jour A.")
 
 
-    def em_algorithm(self, observations, iterations=10):
+    def em_algorithm(self, observations):
         """
         Applique l'algorithme EM pour ajuster le modèle de facteurs dynamiques.
         """
          
         self.observations = observations
         
-        for _ in range(iterations):
+        for _ in range(self.iterations):
             for observation in observations:
-                self.kalman_filter(observation)
-            self.kalman_smoother()
+                self._kalman_filter(observation)
+            self._kalman_smoother()
             self.e_step()
             self.m_step()

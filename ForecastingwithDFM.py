@@ -75,7 +75,7 @@ class ForecastingWithDFM:
         X_ar = self.prepare_data(y, None)
         self.reg_ar.fit(X_ar, y_adjusted)
 
-    def prepare_datag(self, y, factors):
+    def prepare_data(self, y, factors):
         # Assurez-vous que y est une matrice avec des lignes comme observations
         y = np.asarray(y)
         if y.ndim == 1:
@@ -149,6 +149,7 @@ class ForecastingWithDFM:
         :return: Prévisions de la variable cible.
         """
         X_f = self.prepare_data(y, factors)
+        print(X_f)
         prediction_f = self.reg_f.predict(X_f)
         prediction_ar = self.reg_ar.predict(X_f[:, :self.lags_y])
         return prediction_f, prediction_ar

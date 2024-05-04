@@ -8,6 +8,7 @@ from statsmodels.tsa.stattools import adfuller
 import pandas as pd
 import numpy as np
 #### Récupération des données###################################
+
 """
 observation_date : Date d'observation.
 CPI : Indice des prix à la consommation.
@@ -45,7 +46,6 @@ data_diff = data[['CPI', 'INDPRO', 'RPI']].diff().dropna()  # Calculer la premi�
 for column in data_diff.columns:
     test_stationarity(data_diff[column], column)
 
-
 # Ajouter la série stationnaire UNRATE déjà existante dans le dataframe original
 data_diff['UNRATE'] = data['UNRATE'].iloc[1:].values#.reset_index(drop=True)
 
@@ -61,14 +61,49 @@ data_diff.tail(), data_diff.index
 
 # Génération de données simulées pour tester le modèle
 T, N, r = data_diff.shape[0], data_diff.shape[1], 3  # Nombre de périodes, variables observées, facteurs
+### Paramètre pour KFS##########
+# La matrice de transition d'état A doit être r x r
+A = np.eye(r)
 
+# Si vous avez 4 variables observées (pour CPI_diff, INDPRO_diff, RPI_diff, UNRATE_diff),
+# la matrice d'observation C doit être 4 x r
+C = np.random.rand(N, r)  # initialisée aléatoirement, ajustez selon votre modèle
+
+# La matrice de covariance du bruit du processus Q doit être r x r
+Q = np.eye(r) * 0.01
+
+# La matrice de covariance du bruit d'observation R doit être 4 x 4
+R = np.eye(N) * 0.02
+
+# L'état initial estimé du système doit être de taille r
+initial_state = np.zeros(r)
+
+# La covariance initiale estimée doit être r x r
+initial_covariance = np.eye(r) * 0.1
+
+paramKFS=[A,C,Q,R,initial_state,initial_covariance]
 ##### DFM############
 # Exemple d'initialisation et d'utilisation de la classe
-dfm_example = DynamicFactorModel(n_factors=N, n_variables=r)
-print(dfm_example)  # Afficher les informations du modèle
+dfm_PC = DynamicFactorModel(n_factors=N, n_variables=r,extraction_method="PC",params=paramKFS)
+# Afficher les informations du modèle
 
-Y_simulated =np.array(data_diff) #np.random.randn(T, N)
+Y_simulated =np.array(data_diff)
+dfm_PC.fit(Y_simulated)
 
+# Affichage des résultats
+print("\nChargements de facteurs estimés (Lambda):")
+print(dfm_PC.factor_loadings)
+print("\nVariances idiosyncratiques estimées (diagonal de Sigma_e):")
+print(dfm_PC.idiosyncratic_variances)
+#####Principal Components############
+
+dfm_PC.fit(Y_simulated)  # Adapter le modèle
+factor_scores = dfm_PC.transform(Y_simulated)  # Transformer les données
+#####KFM#############################
+dfm_KFS = DynamicFactorModel(n_factors=N, n_variables=r,extraction_method="KFS",params=paramKFS,iterations=10)
+dfm_KFS.fit(Y_simulated)
+
+"""
 # Adapter le modèle aux données simulées
 dfm_example.fit(Y_simulated)
 
@@ -98,26 +133,10 @@ print(pc_model.get_eigenvalues())
 
 #####KFS######################
 # Supposons que nous avons les matrices suivantes pour notre modèle de facteurs dynamiques
-# La matrice de transition d'état A doit être r x r
-A = np.eye(r)
 
-# Si vous avez 4 variables observées (pour CPI_diff, INDPRO_diff, RPI_diff, UNRATE_diff),
-# la matrice d'observation C doit être 4 x r
-C = np.random.rand(N, r)  # initialisée aléatoirement, ajustez selon votre modèle
-
-# La matrice de covariance du bruit du processus Q doit être r x r
-Q = np.eye(r) * 0.01
-
-# La matrice de covariance du bruit d'observation R doit être 4 x 4
-R = np.eye(N) * 0.02
-
-# L'état initial estimé du système doit être de taille r
-initial_state = np.zeros(r)
-
-# La covariance initiale estimée doit être r x r
-initial_covariance = np.eye(r) * 0.1
 # Création d'observations factices pour le test
 observations = np.random.rand(T, N)  
+##################KFM##########################
 
 # Instanciation de la classe KalmanFilterSmoother avec les paramètres du modèle
 kfs = KalmanFilterSmoother(A, C, Q, R, initial_state, initial_covariance)
@@ -135,22 +154,21 @@ print("Estimations des états:", kfs.smoothed_states)
 ################Forecating with DFM#############################
 
 y = np.random.randn(100, 1)  # Simuler une série temporelle
-factors = np.random.randn(100, 3)  # Simuler des facteurs estimés
+factors = np.random.randn(T, 3)  # Simuler des facteurs estimés
 print(data_diff.shape)
-print(factor_scores.shape)
+print(factor_scores)
 
 # Pour les prévisions avec DFM, initialiser le modèle avec le nombre correct de retards et de facteurs
 forecasting_model = ForecastingWithDFM(num_factors=r, lags_y=1, lags_f=1)
 
 # Ajuster le modèle sur les données
-forecasting_model.fit(data_diff.values, factor_scores)
+forecasting_model.fit(data_diff.values,factor_scores)
 # Faire des prévisions avec le modèle ajusté
 predictions = forecasting_model.predict(data_diff.values, factor_scores)
 # Afficher les prédictions
 print(predictions)
 
-
-
+"""
 """
 forecasting_model = ForecastingWithDFM(num_factors=r, lags_y=1, lags_f=1)
 forecasting_model.fit(y, factors)
